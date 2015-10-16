@@ -21,12 +21,24 @@ class Order extends Application {
         
         $neworder = $this->orders->create();
         $neworder->num = $order_num;
-        $neworder->date = date();
+        $neworder->date = date('Y-M-d H:m:s');
         $neworder->status = 'a';
         $neworder->total = 0;
         
         $this->orders->add($neworder);
         redirect('/order/display_menu/' . $order_num);
+    }
+    
+    // commits the order into the database as done
+    function commit($order_num) {
+        if (!$this->orders->validate($order_num))
+            redirect('/order/display_menu/' . $order_num);
+        $record = $this->orders->get($order_num);
+        $record->date = date(DATE_ATOM);
+        $record->status = 'c';
+        $record->total = $this->orders->total($order_num);
+        $this->orders->update($record);
+        redirect('/');
     }
 
     // add to an order
@@ -85,24 +97,41 @@ class Order extends Application {
 
     // checkout
     function checkout($order_num) {
-        $this->data['title'] = 'Checking Out';
+        $this->data['title'] = 'Checking out';
         $this->data['pagebody'] = 'show_order';
         $this->data['order_num'] = $order_num;
-        //FIXME
 
+        $this->data['total'] = number_format($this->orders->total($order_num), 2);
+
+        $items = $this->orderitems->group($order_num);
+        foreach ($items as $item)
+        {
+            $menuitem = $this->menu->get($item->item);
+            $item->code = $menuitem->name;
+        }
+        $this->data['items'] = $items;
+
+        $this->data['okornot'] = $this->orders->validate($order_num) ? "" : "disabled";
+        //$this->data['onclick'] = $this->orders->validate($order_num) ? "" : "onclick='return false;'"; //this is to disable the click on the button, we don't need to do that in this case
+        
         $this->render();
     }
 
     // proceed with checkout
     function proceed($order_num) {
-        //FIXME
+        //FIX ME
+        
         redirect('/');
     }
 
     // cancel the order
-    function cancel($order_num) {
-        //FIXME
-        redirect('/');
+    function cancel($order_num)
+    {
+            $this->orderitems->delete_some($order_num);
+            $record = $this->orders->get($order_num);
+            $record->status = 'x';
+            $this->orders->update($record);
+            redirect('/');
     }
 
 }
